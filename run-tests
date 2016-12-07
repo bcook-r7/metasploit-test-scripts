@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# This script runs through the available sessions
+#
+
+LHOST=172.28.128.1
+LPORT=8080
+
+for OS in `sed '/^$/d;/^#/d' oses`; do
+	echo $OS
+	echo "Bringing up $OS"
+	touch test.exe
+	vagrant up $OS
+	sleep 10
+
+	for PAYLOAD in `sed '/^$/d;/^#/d' payloads`; do
+		./run-session $OS $PAYLOAD $LHOST $LPORT
+	done
+
+	vagrant destroy -f $OS
+done

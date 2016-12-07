@@ -1,0 +1,8 @@
+#!/bin/sh
+OS=$1
+PAYLOADFILE=$2
+echo "Provisioning payload for $OS"
+vagrant ssh $OS -- taskkill /F /IM $PAYLOADFILE || true
+vagrant provision $OS
+echo "Starting payload for $OS"
+vagrant ssh $OS -- "./$PAYLOADFILE &"

